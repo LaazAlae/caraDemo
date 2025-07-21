@@ -1,7 +1,7 @@
 import asyncio
 import random
 from typing import Dict, Any
-from ..base import BaseDetectionProvider
+from .. import BaseDetectionProvider
 from ...aggregation.schemas import DetectionResult, RiskLevel, ProviderStatus
 from ...core.config import settings
 

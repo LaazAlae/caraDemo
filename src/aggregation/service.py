@@ -134,10 +134,17 @@ class DetectionAggregator:
                     risk_factors = result.metadata.get("risk_factors", [])
                     factors.extend(risk_factors)
                 elif result.capability == "face_detection":
-                    if result.metadata.get("celebrities_found", 0) > 0:
-                        factors.append("Celebrity face detected in image")
+                    # Show detailed celebrity information from AWS
+                    celebrities = result.metadata.get("celebrities", [])
+                    if celebrities:
+                        for celeb in celebrities:
+                            name = celeb.get("name", "Unknown")
+                            confidence = celeb.get("confidence", 0)
+                            factors.append(f"🎯 Celebrity detected: {name} ({confidence:.1f}% confidence)")
                     else:
-                        factors.append("Human faces detected in content")
+                        faces_count = result.metadata.get("total_faces", 0)
+                        if faces_count > 0:
+                            factors.append(f"👤 {faces_count} human face(s) detected")
         
         if not factors:
             factors.append("Content analyzed - standard digital media detected")

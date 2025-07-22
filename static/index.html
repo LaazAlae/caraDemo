@@ -175,17 +175,18 @@
                 this.resultsSection = document.getElementById('results-section');
                 this.progressBar = document.getElementById('progress-bar');
                 this.uploadStatus = document.getElementById('upload-status');
+                this.currentResult = null; // Store the result data
                 
                 this.initializeEventListeners();
             }
-
+        
             initializeEventListeners() {
                 // File upload events
                 this.uploadZone.addEventListener('dragover', this.handleDragOver.bind(this));
                 this.uploadZone.addEventListener('dragleave', this.handleDragLeave.bind(this));
                 this.uploadZone.addEventListener('drop', this.handleDrop.bind(this));
                 this.fileInput.addEventListener('change', this.handleFileSelect.bind(this));
-
+        
                 // Tab navigation
                 document.addEventListener('click', (e) => {
                     if (e.target.classList.contains('tab-button')) {
@@ -193,17 +194,17 @@
                     }
                 });
             }
-
+        
             handleDragOver(e) {
                 e.preventDefault();
                 this.uploadZone.classList.add('border-cara-blue', 'bg-blue-50');
             }
-
+        
             handleDragLeave(e) {
                 e.preventDefault();
                 this.uploadZone.classList.remove('border-cara-blue', 'bg-blue-50');
             }
-
+        
             handleDrop(e) {
                 e.preventDefault();
                 this.uploadZone.classList.remove('border-cara-blue', 'bg-blue-50');
@@ -211,44 +212,45 @@
                 const files = Array.from(e.dataTransfer.files);
                 this.processFiles(files);
             }
-
+        
             handleFileSelect(e) {
                 const files = Array.from(e.target.files);
                 this.processFiles(files);
             }
-
+        
             async processFiles(files) {
                 if (files.length === 0) return;
-
+        
                 // Show progress section
                 this.progressSection.classList.remove('hidden');
                 this.uploadStatus.textContent = 'Uploading and analyzing...';
                 
                 // Animate progress bar
                 this.animateProgress();
-
+        
                 // Upload first file (for demo, we'll process one file)
                 const file = files[0];
                 const formData = new FormData();
                 formData.append('file', file);
-
+        
                 try {
                     const response = await fetch('/api/analyze', {
                         method: 'POST',
                         body: formData
                     });
-
+        
                     if (!response.ok) {
                         throw new Error('Upload failed');
                     }
-
+        
                     const result = await response.json();
+                    this.currentResult = result; // Store the result
                     this.displayResults(result);
                 } catch (error) {
                     this.showError(error.message);
                 }
             }
-
+        
             animateProgress() {
                 let progress = 0;
                 const interval = setInterval(() => {
@@ -271,27 +273,27 @@
                     }
                 }, 200);
             }
-
+        
             displayResults(result) {
                 // Hide progress, show results
                 this.progressSection.classList.add('hidden');
                 this.resultsSection.classList.remove('hidden');
-
+        
                 // Set overall risk level
                 this.setOverallRisk(result.overall_risk_level, result.overall_confidence);
-
+        
                 // Display provider results
                 this.displayProviderResults(result);
-
-                // Load default tab content
+        
+                // Load default tab content with data
                 this.loadTabContent('overview', result);
             }
-
+        
             setOverallRisk(riskLevel, confidence) {
                 const badge = document.getElementById('overall-risk-badge');
                 const meter = document.getElementById('risk-meter');
                 const confidenceSpan = document.getElementById('confidence-score');
-
+        
                 // Update badge
                 const riskConfig = {
                     'low': { class: 'bg-green-100 text-green-800', text: 'Low Risk' },
@@ -299,11 +301,11 @@
                     'high': { class: 'bg-red-100 text-red-800', text: 'High Risk' },
                     'critical': { class: 'bg-red-600 text-white', text: 'Critical Risk' }
                 };
-
+        
                 const config = riskConfig[riskLevel];
                 badge.className = `px-4 py-2 rounded-full text-sm font-semibold ${config.class}`;
                 badge.textContent = config.text;
-
+        
                 // Update risk meter
                 const meterColors = {
                     'low': 'bg-green-500',
@@ -311,33 +313,35 @@
                     'high': 'bg-red-500',
                     'critical': 'bg-red-600'
                 };
-
+        
                 meter.className = `h-4 rounded-full transition-all duration-1000 ease-out ${meterColors[riskLevel]}`;
                 meter.style.width = `${confidence}%`;
-
+        
                 confidenceSpan.textContent = `${Math.round(confidence)}% Confidence`;
             }
-
+        
             displayProviderResults(result) {
                 const container = document.getElementById('provider-results');
                 container.innerHTML = '';
-
+        
                 const providers = [
-                    { name: 'TinEye', key: 'reverse_search', icon: '🔍' },
+                    { name: 'Google Vision', key: 'image_analysis', icon: '🔍' },
                     { name: 'AWS Rekognition', key: 'face_detection', icon: '👤' },
+                    { name: 'TinEye Search', key: 'reverse_search', icon: '🌐' },
                     { name: 'Sensity AI', key: 'deepfake_detection', icon: '🤖' },
                     { name: 'ACRCloud', key: 'audio_fingerprint', icon: '🎵' }
                 ];
-
-                providers.forEach(provider => {
-                    const providerResult = result[provider.key];
-                    if (providerResult) {
+        
+                // Find results for each provider
+                result.results.forEach(providerResult => {
+                    const provider = providers.find(p => p.key === providerResult.capability);
+                    if (provider) {
                         const card = this.createProviderCard(provider, providerResult);
                         container.appendChild(card);
                     }
                 });
             }
-
+        
             createProviderCard(provider, result) {
                 const div = document.createElement('div');
                 
@@ -370,11 +374,11 @@
                     'high': 'text-red-600', 
                     'critical': 'text-red-700'
                 };
-
+        
                 // Show real data from working providers
                 const statusText = result.status === 'success' ? result.risk_level.toUpperCase() : 'ERROR';
                 const statusColor = result.status === 'success' ? riskColors[result.risk_level] : 'text-red-600';
-
+        
                 div.innerHTML = `
                     <div class="flex items-center justify-between mb-3">
                         <div class="flex items-center space-x-2">
@@ -396,133 +400,152 @@
                         </div>
                     </div>
                 `;
-
+        
                 return div;
             }
-
+        
             switchTab(tabName) {
                 // Update active tab
                 document.querySelectorAll('.tab-button').forEach(btn => {
                     btn.classList.remove('active', 'border-cara-blue', 'text-cara-blue');
                     btn.classList.add('border-transparent', 'text-gray-500');
                 });
-
+        
                 const activeTab = document.querySelector(`[data-tab="${tabName}"]`);
                 activeTab.classList.add('active', 'border-cara-blue', 'text-cara-blue');
                 activeTab.classList.remove('border-transparent', 'text-gray-500');
-
-                // Load tab content
-                this.loadTabContent(tabName);
+        
+                // Load tab content with stored result
+                this.loadTabContent(tabName, this.currentResult);
             }
-
+        
             loadTabContent(tabName, result = null) {
                 const content = document.getElementById('tab-content');
                 
+                if (!result) {
+                    content.innerHTML = `<p class="text-gray-500">No analysis data available</p>`;
+                    return;
+                }
+                
                 switch(tabName) {
                     case 'overview':
-                        if (result && result.risk_factors) {
-                            // Show REAL risk factors from API
-                            const riskFactorsList = result.risk_factors.map(factor => 
-                                `<li class="flex items-center space-x-2">
-                                    <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
-                                    <span class="text-sm">${factor}</span>
-                                </li>`
-                            ).join('');
+                        const riskFactorsList = result.risk_factors.map(factor => 
+                            `<li class="flex items-center space-x-2">
+                                <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                <span class="text-sm">${factor}</span>
+                            </li>`
+                        ).join('');
+                        
+                        content.innerHTML = `
+                            <div class="space-y-6">
+                                <div class="grid md:grid-cols-2 gap-6">
+                                    <div class="space-y-4">
+                                        <h4 class="font-semibold text-cara-dark">Risk Factors Detected</h4>
+                                        <ul class="space-y-2">
+                                            ${riskFactorsList}
+                                        </ul>
+                                    </div>
+                                    <div class="space-y-4">
+                                        <h4 class="font-semibold text-cara-dark">Analysis Summary</h4>
+                                        <p class="text-sm text-gray-600">
+                                            File: ${result.original_filename || 'Unknown'}<br>
+                                            Processing time: ${result.total_processing_time_ms}ms<br>
+                                            Total detections: ${result.total_matches}<br>
+                                            Risk level: ${result.overall_risk_level.toUpperCase()}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        break;
+                    
+                    case 'matches':
+                        // Show detailed matches from working providers
+                        const workingResults = result.results.filter(r => r.status === 'success' && r.matches_found > 0);
+                        
+                        if (workingResults.length === 0) {
+                            content.innerHTML = `<p class="text-gray-500">No specific matches detected by current providers</p>`;
+                            break;
+                        }
+                        
+                        const matchCards = workingResults.map(r => {
+                            const riskColor = {
+                                'low': 'bg-green-50 border-green-200 text-green-900',
+                                'medium': 'bg-yellow-50 border-yellow-200 text-yellow-900', 
+                                'high': 'bg-red-50 border-red-200 text-red-900',
+                                'critical': 'bg-red-100 border-red-300 text-red-900'
+                            }[r.risk_level] || 'bg-gray-50 border-gray-200 text-gray-900';
                             
-                            content.innerHTML = `
-                                <div class="space-y-6">
-                                    <div class="grid md:grid-cols-2 gap-6">
-                                        <div class="space-y-4">
-                                            <h4 class="font-semibold text-cara-dark">Risk Factors Detected</h4>
-                                            <ul class="space-y-2">
-                                                ${riskFactorsList}
-                                            </ul>
-                                        </div>
-                                        <div class="space-y-4">
-                                            <h4 class="font-semibold text-cara-dark">Analysis Summary</h4>
-                                            <p class="text-sm text-gray-600">
-                                                File: ${result.original_filename || 'Unknown'}<br>
-                                                Processing time: ${result.total_processing_time_ms}ms<br>
-                                                Total detections: ${result.total_matches}
+                            // Show detailed info from metadata
+                            let details = `Found ${r.matches_found} detection(s) with ${Math.round(r.confidence)}% confidence`;
+                            
+                            if (r.capability === 'face_detection' && r.metadata.celebrities) {
+                                const celebs = r.metadata.celebrities.map(c => 
+                                    `${c.name} (${c.confidence.toFixed(1)}%)`
+                                ).join(', ');
+                                if (celebs) details = `🎯 Celebrities: ${celebs}`;
+                            }
+                            
+                            if (r.capability === 'image_analysis' && r.metadata.top_objects) {
+                                const objects = r.metadata.top_objects.slice(0, 3).join(', ');
+                                if (objects) details += `<br>📋 Objects: ${objects}`;
+                            }
+                            
+                            return `
+                                <div class="${riskColor} border rounded-lg p-4">
+                                    <div class="flex items-start space-x-3">
+                                        <div class="w-3 h-3 bg-current rounded-full mt-1 opacity-70"></div>
+                                        <div class="flex-1">
+                                            <h5 class="font-medium">${r.provider} Detection</h5>
+                                            <p class="text-sm mt-1">${details}</p>
+                                            <p class="text-xs mt-2 opacity-75">
+                                                Capability: ${r.capability.replace('_', ' ')} | Risk: ${r.risk_level.toUpperCase()}
                                             </p>
                                         </div>
                                     </div>
                                 </div>
                             `;
-                        } else {
-                            content.innerHTML = `<p class="text-gray-500">No analysis data available</p>`;
-                        }
-                        break;
-                    
-                    case 'matches':
-                        if (result && result.results) {
-                            // Show REAL matches from working providers
-                            const matchCards = result.results
-                                .filter(r => r.status === 'success' && r.matches_found > 0)
-                                .map(r => {
-                                    const riskColor = {
-                                        'low': 'bg-green-50 border-green-200 text-green-900',
-                                        'medium': 'bg-yellow-50 border-yellow-200 text-yellow-900', 
-                                        'high': 'bg-red-50 border-red-200 text-red-900',
-                                        'critical': 'bg-red-100 border-red-300 text-red-900'
-                                    }[r.risk_level] || 'bg-gray-50 border-gray-200 text-gray-900';
-                                    
-                                    return `
-                                        <div class="${riskColor} border rounded-lg p-4">
-                                            <div class="flex items-start space-x-3">
-                                                <div class="w-3 h-3 bg-current rounded-full mt-1 opacity-70"></div>
-                                                <div class="flex-1">
-                                                    <h5 class="font-medium">${r.provider} Detection</h5>
-                                                    <p class="text-sm mt-1">
-                                                        Found ${r.matches_found} detection(s) with ${Math.round(r.confidence)}% confidence
-                                                    </p>
-                                                    <p class="text-xs mt-2 opacity-75">
-                                                        Capability: ${r.capability.replace('_', ' ')} | Risk: ${r.risk_level.toUpperCase()}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    `;
-                                }).join('');
-                            
-                            content.innerHTML = matchCards || `<p class="text-gray-500">No matches detected by current providers</p>`;
-                        } else {
-                            content.innerHTML = `<p class="text-gray-500">No match data available</p>`;
-                        }
+                        }).join('');
+                        
+                        content.innerHTML = matchCards;
                         break;
                     
                     case 'recommendations':
-                        if (result && result.recommendations) {
-                            // Show REAL recommendations
-                            const recList = result.recommendations.map(rec => `<li>• ${rec}</li>`).join('');
-                            
-                            content.innerHTML = `
-                                <div class="space-y-6">
-                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                        <h5 class="font-medium text-blue-900 mb-2">AI-Generated Recommendations</h5>
-                                        <ul class="space-y-1 text-sm text-blue-800">
-                                            ${recList}
-                                        </ul>
-                                    </div>
+                        const recList = result.recommendations.map(rec => `<li>• ${rec}</li>`).join('');
+                        
+                        content.innerHTML = `
+                            <div class="space-y-6">
+                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                    <h5 class="font-medium text-blue-900 mb-2">AI-Generated Recommendations</h5>
+                                    <ul class="space-y-1 text-sm text-blue-800">
+                                        ${recList}
+                                    </ul>
                                 </div>
-                            `;
-                        } else {
-                            content.innerHTML = `<p class="text-gray-500">No recommendations available</p>`;
-                        }
+                                
+                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                                    <h5 class="font-medium text-yellow-900 mb-2">Next Steps</h5>
+                                    <ul class="space-y-1 text-sm text-yellow-800">
+                                        <li>• Enable additional detection providers for comprehensive analysis</li>
+                                        <li>• Set up automated monitoring for similar content</li>
+                                        <li>• Consider legal consultation for high-risk content</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        `;
                         break;
                 }
             }
-
+        
             showError(message) {
                 this.progressSection.classList.add('hidden');
                 alert(`Error: ${message}`);
             }
         }
-
+        
         // Initialize the interface when DOM is loaded
         document.addEventListener('DOMContentLoaded', () => {
             new CaraAnalysisInterface();
         });
-    </script>
+        </script>
 </body>
 </html>

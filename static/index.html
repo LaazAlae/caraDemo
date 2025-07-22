@@ -340,6 +340,28 @@
 
             createProviderCard(provider, result) {
                 const div = document.createElement('div');
+                
+                // Check if this is a "Coming Soon" provider
+                if (result.status === 'not_configured' && result.error_message && result.error_message.includes('🚀')) {
+                    div.className = 'bg-blue-50 rounded-xl p-4 border border-blue-200';
+                    div.innerHTML = `
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-lg">${provider.icon}</span>
+                                <span class="font-medium text-gray-900">${provider.name}</span>
+                            </div>
+                            <span class="text-blue-600 text-xs font-medium bg-blue-100 px-2 py-1 rounded">
+                                COMING SOON
+                            </span>
+                        </div>
+                        <div class="text-sm text-blue-700">
+                            ${result.error_message.replace('🚀 Coming Soon - ', '')}
+                        </div>
+                    `;
+                    return div;
+                }
+                
+                // Regular provider card for working APIs
                 div.className = 'bg-gray-50 rounded-xl p-4 border border-gray-200';
                 
                 const riskColors = {
@@ -349,14 +371,18 @@
                     'critical': 'text-red-700'
                 };
 
+                // Show real data from working providers
+                const statusText = result.status === 'success' ? result.risk_level.toUpperCase() : 'ERROR';
+                const statusColor = result.status === 'success' ? riskColors[result.risk_level] : 'text-red-600';
+
                 div.innerHTML = `
                     <div class="flex items-center justify-between mb-3">
                         <div class="flex items-center space-x-2">
                             <span class="text-lg">${provider.icon}</span>
                             <span class="font-medium text-gray-900">${provider.name}</span>
                         </div>
-                        <span class="${riskColors[result.risk_level]} text-sm font-medium">
-                            ${result.risk_level.toUpperCase()}
+                        <span class="${statusColor} text-sm font-medium">
+                            ${statusText}
                         </span>
                     </div>
                     <div class="space-y-2">
@@ -365,7 +391,7 @@
                             <span class="text-sm font-medium">${Math.round(result.confidence)}%</span>
                         </div>
                         <div class="flex justify-between">
-                            <span class="text-sm text-gray-600">Matches</span>
+                            <span class="text-sm text-gray-600">Detections</span>
                             <span class="text-sm font-medium">${result.matches_found}</span>
                         </div>
                     </div>
@@ -394,88 +420,95 @@
                 
                 switch(tabName) {
                     case 'overview':
-                        content.innerHTML = `
-                            <div class="space-y-6">
-                                <div class="grid md:grid-cols-2 gap-6">
-                                    <div class="space-y-4">
-                                        <h4 class="font-semibold text-cara-dark">Risk Factors</h4>
-                                        <ul class="space-y-2">
-                                            <li class="flex items-center space-x-2">
-                                                <span class="w-2 h-2 bg-red-500 rounded-full"></span>
-                                                <span class="text-sm">Potential unauthorized usage detected</span>
-                                            </li>
-                                            <li class="flex items-center space-x-2">
-                                                <span class="w-2 h-2 bg-yellow-500 rounded-full"></span>
-                                                <span class="text-sm">Multiple platform matches found</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    <div class="space-y-4">
-                                        <h4 class="font-semibold text-cara-dark">Analysis Summary</h4>
-                                        <p class="text-sm text-gray-600">
-                                            Our AI analysis across multiple detection providers has identified 
-                                            several potential instances of unauthorized usage of your digital content.
-                                        </p>
+                        if (result && result.risk_factors) {
+                            // Show REAL risk factors from API
+                            const riskFactorsList = result.risk_factors.map(factor => 
+                                `<li class="flex items-center space-x-2">
+                                    <span class="w-2 h-2 bg-blue-500 rounded-full"></span>
+                                    <span class="text-sm">${factor}</span>
+                                </li>`
+                            ).join('');
+                            
+                            content.innerHTML = `
+                                <div class="space-y-6">
+                                    <div class="grid md:grid-cols-2 gap-6">
+                                        <div class="space-y-4">
+                                            <h4 class="font-semibold text-cara-dark">Risk Factors Detected</h4>
+                                            <ul class="space-y-2">
+                                                ${riskFactorsList}
+                                            </ul>
+                                        </div>
+                                        <div class="space-y-4">
+                                            <h4 class="font-semibold text-cara-dark">Analysis Summary</h4>
+                                            <p class="text-sm text-gray-600">
+                                                File: ${result.original_filename || 'Unknown'}<br>
+                                                Processing time: ${result.total_processing_time_ms}ms<br>
+                                                Total detections: ${result.total_matches}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        `;
+                            `;
+                        } else {
+                            content.innerHTML = `<p class="text-gray-500">No analysis data available</p>`;
+                        }
                         break;
                     
                     case 'matches':
-                        content.innerHTML = `
-                            <div class="space-y-4">
-                                <div class="bg-red-50 border border-red-200 rounded-lg p-4">
-                                    <div class="flex items-start space-x-3">
-                                        <div class="w-3 h-3 bg-red-500 rounded-full mt-1"></div>
-                                        <div class="flex-1">
-                                            <h5 class="font-medium text-red-900">High Risk Match</h5>
-                                            <p class="text-sm text-red-700 mt-1">
-                                                Similar content found on social media platform without attribution
-                                            </p>
-                                            <p class="text-xs text-red-600 mt-2">Confidence: 94% | Source: Multiple platforms</p>
+                        if (result && result.results) {
+                            // Show REAL matches from working providers
+                            const matchCards = result.results
+                                .filter(r => r.status === 'success' && r.matches_found > 0)
+                                .map(r => {
+                                    const riskColor = {
+                                        'low': 'bg-green-50 border-green-200 text-green-900',
+                                        'medium': 'bg-yellow-50 border-yellow-200 text-yellow-900', 
+                                        'high': 'bg-red-50 border-red-200 text-red-900',
+                                        'critical': 'bg-red-100 border-red-300 text-red-900'
+                                    }[r.risk_level] || 'bg-gray-50 border-gray-200 text-gray-900';
+                                    
+                                    return `
+                                        <div class="${riskColor} border rounded-lg p-4">
+                                            <div class="flex items-start space-x-3">
+                                                <div class="w-3 h-3 bg-current rounded-full mt-1 opacity-70"></div>
+                                                <div class="flex-1">
+                                                    <h5 class="font-medium">${r.provider} Detection</h5>
+                                                    <p class="text-sm mt-1">
+                                                        Found ${r.matches_found} detection(s) with ${Math.round(r.confidence)}% confidence
+                                                    </p>
+                                                    <p class="text-xs mt-2 opacity-75">
+                                                        Capability: ${r.capability.replace('_', ' ')} | Risk: ${r.risk_level.toUpperCase()}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                                    <div class="flex items-start space-x-3">
-                                        <div class="w-3 h-3 bg-yellow-500 rounded-full mt-1"></div>
-                                        <div class="flex-1">
-                                            <h5 class="font-medium text-yellow-900">Medium Risk Match</h5>
-                                            <p class="text-sm text-yellow-700 mt-1">
-                                                Facial recognition match in public database
-                                            </p>
-                                            <p class="text-xs text-yellow-600 mt-2">Confidence: 76% | Source: Image database</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
+                                    `;
+                                }).join('');
+                            
+                            content.innerHTML = matchCards || `<p class="text-gray-500">No matches detected by current providers</p>`;
+                        } else {
+                            content.innerHTML = `<p class="text-gray-500">No match data available</p>`;
+                        }
                         break;
                     
                     case 'recommendations':
-                        content.innerHTML = `
-                            <div class="space-y-6">
-                                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h5 class="font-medium text-blue-900 mb-2">Immediate Actions</h5>
-                                    <ul class="space-y-2 text-sm text-blue-800">
-                                        <li>• Contact platform administrators for content removal</li>
-                                        <li>• Document evidence for potential legal action</li>
-                                        <li>• Monitor for additional unauthorized usage</li>
-                                    </ul>
+                        if (result && result.recommendations) {
+                            // Show REAL recommendations
+                            const recList = result.recommendations.map(rec => `<li>• ${rec}</li>`).join('');
+                            
+                            content.innerHTML = `
+                                <div class="space-y-6">
+                                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                        <h5 class="font-medium text-blue-900 mb-2">AI-Generated Recommendations</h5>
+                                        <ul class="space-y-1 text-sm text-blue-800">
+                                            ${recList}
+                                        </ul>
+                                    </div>
                                 </div>
-                                
-                                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
-                                    <h5 class="font-medium text-green-900 mb-2">Preventive Measures</h5>
-                                    <ul class="space-y-2 text-sm text-green-800">
-                                        <li>• Implement digital watermarking on future content</li>
-                                        <li>• Set up automated monitoring alerts</li>
-                                        <li>• Register copyright where applicable</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        `;
+                            `;
+                        } else {
+                            content.innerHTML = `<p class="text-gray-500">No recommendations available</p>`;
+                        }
                         break;
                 }
             }

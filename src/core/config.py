@@ -3,13 +3,12 @@ from typing import List
 import os
 
 class Settings(BaseSettings):
-    # API Keys
-    tineye_api_key: str = ""
+    # Google Vision API (Primary - Easy setup)
+    google_vision_api_key: str = ""
+    
+    # AWS (Secondary - More powerful but harder setup)
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
-    sensity_api_token: str = ""
-    acrcloud_access_key: str = ""
-    acrcloud_secret_key: str = ""
     
     # Application
     secret_key: str = "development-key-change-in-production"

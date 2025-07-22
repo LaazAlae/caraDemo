@@ -12,3 +12,4 @@ redis==5.0.1
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 pillow==10.1.0
+google-cloud-vision==3.4.5

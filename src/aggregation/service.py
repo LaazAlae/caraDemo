@@ -4,18 +4,20 @@ from datetime import datetime
 from typing import List, Dict, Any
 from ..aggregation.schemas import UnifiedAnalysisResult, DetectionResult, RiskLevel
 from ..core.security import security_validator
-from ..providers.tineye.client import tineye_provider
+from ..providers.google_vision.client import google_vision_provider
 from ..providers.aws_rekognition.client import aws_rekognition_provider
+from ..providers.tineye.client import tineye_provider
 from ..providers.sensity.client import sensity_provider
 from ..providers.acrcloud.client import acrcloud_provider
 
 class DetectionAggregator:
     def __init__(self):
         self.providers = [
-            tineye_provider,
-            aws_rekognition_provider, 
-            sensity_provider,
-            acrcloud_provider
+            google_vision_provider,      # Basic detection
+            aws_rekognition_provider,   # CELEBRITY DETECTION ✨
+            tineye_provider,            # Coming Soon
+            sensity_provider,           # Coming Soon  
+            acrcloud_provider          # Coming Soon
         ]
     
     async def analyze_file(
@@ -79,7 +81,7 @@ class DetectionAggregator:
         if not results:
             return RiskLevel.LOW, 0.0
         
-        # Get successful results only
+        # Get successful results only (ignore "Coming Soon" providers)
         successful_results = [r for r in results if r.status.value == "success"]
         
         if not successful_results:
@@ -126,25 +128,19 @@ class DetectionAggregator:
         factors = []
         
         for result in results:
-            if result.matches_found > 0:
-                if result.capability == "reverse_search":
-                    factors.append(f"Similar images found online ({result.matches_found} matches)")
+            if result.status.value == "success" and result.matches_found > 0:
+                if result.capability == "image_analysis":
+                    # Extract real factors from Google Vision
+                    risk_factors = result.metadata.get("risk_factors", [])
+                    factors.extend(risk_factors)
                 elif result.capability == "face_detection":
                     if result.metadata.get("celebrities_found", 0) > 0:
                         factors.append("Celebrity face detected in image")
                     else:
                         factors.append("Human faces detected in content")
-                elif result.capability == "deepfake_detection":
-                    techniques = result.metadata.get("techniques_detected", [])
-                    if techniques:
-                        factors.append(f"Potential deepfake techniques: {', '.join(techniques)}")
-                elif result.capability == "audio_fingerprint":
-                    music_matches = result.metadata.get("music", [])
-                    if music_matches:
-                        factors.append("Copyrighted music detected in audio")
         
         if not factors:
-            factors.append("No significant risk factors detected")
+            factors.append("Content analyzed - standard digital media detected")
         
         return factors
     
@@ -154,24 +150,24 @@ class DetectionAggregator:
         
         if risk_level in [RiskLevel.HIGH, RiskLevel.CRITICAL]:
             recommendations.extend([
-                "Immediate action required - potential unauthorized use detected",
-                "Document all evidence for potential legal proceedings",
-                "Contact platforms directly for content removal requests",
-                "Consider issuing DMCA takedown notices where applicable"
+                "Review content for potential policy violations",
+                "Consider implementing additional content safeguards",
+                "Monitor for unauthorized usage across platforms",
+                "Document analysis results for compliance records"
             ])
         elif risk_level == RiskLevel.MEDIUM:
             recommendations.extend([
-                "Monitor for additional instances of unauthorized use",
-                "Consider watermarking future content releases",
-                "Review platform usage policies and terms of service",
-                "Set up automated monitoring alerts"
+                "Standard monitoring recommended for this content type",
+                "Consider watermarking for future content protection",
+                "Regular analysis recommended for similar content",
+                "Implement basic usage tracking"
             ])
         else:
             recommendations.extend([
-                "Continue regular monitoring of your digital assets",
-                "Implement preventive measures like digital watermarking",
-                "Consider registering copyrights for valuable content",
-                "Stay informed about emerging AI threats"
+                "Content appears standard - continue normal monitoring",
+                "Consider periodic re-analysis for valuable content",
+                "Implement preventive digital watermarking",
+                "Stay updated on emerging AI detection technologies"
             ])
         
         return recommendations
